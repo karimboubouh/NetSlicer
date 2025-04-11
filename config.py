@@ -12,6 +12,8 @@ SLICE_POLICIES = {
     3: {"bw": "1mbit"}  # TOS 3
 }
 
+HANDLE = "1:"
+
 # Platform Detection
 IS_LINUX = platform.system() == "Linux"
 IS_MACOS = platform.system() == "Darwin"

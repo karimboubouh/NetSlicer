@@ -84,7 +84,6 @@ class Scanner:
             item.lower() for item in selected if item.strip() and not any(char.isspace() for char in item)
         ))
         self.filters = " or ".join(filters)
-        print(self.filters)
         return self.filters
 
 

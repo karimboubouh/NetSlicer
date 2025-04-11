@@ -2,7 +2,9 @@ import config
 from core.classifier import PacketClassifier
 from core.network_slice import NetworkSlice
 from core.parser import parse_args
+from core.policy import Policy
 from core.scanner import Scanner
+from core.slices_setup import setup_slices
 from core.sniffer import Sniffer
 from utils import log
 from utils.helpers import setup_environment, reset_environment
@@ -41,17 +43,17 @@ def net_slicer():
     # scanner.select_interface()
     # scanner.packet_filter()  # Berkeley Packet Filter
     # === Network Slices =========================
+    ns_urllc, ns_embb, ns_mmtc = setup_slices(scanner.interface)
     slices = {
-        'urllc': NetworkSlice("urllc", 1, policy=None, args=config.args),
-        'eMBB': NetworkSlice("embb", 2, policy=None, args=config.args),
-        'mMTC': NetworkSlice("mMTC", 3, policy=None, args=config.args),
+        'urllc': ns_urllc,
+        'embb': ns_embb,
+        'mmtc': ns_mmtc
     }
-    print(slices)
 
-    exit(0)
     # === Classifier Sniffer =====================
     classifier = PacketClassifier(slices=slices, args=config.args)
     # === Packet Sniffer ========================
+    exit(0)
     sniffer = Sniffer(args=config.args, scanner=scanner, classifier=classifier)
     sniffer.start_sniffing()
     # === Plot results ==========================

@@ -12,7 +12,6 @@ from scapy.packet import Packet
 from termcolor import colored
 
 from core.parser import Args
-from core.slice_layer import SliceLayer
 from utils.helpers import log
 from utils.metrics import PacketMetrics
 
