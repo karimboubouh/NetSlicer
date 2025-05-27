@@ -1,0 +1,6 @@
+[tool.pyright]
+venvPath = "/Users/karimboubouh/Workspace/Research"
+venv = ".venv"
+
+[tool.ruff]
+line-length = 100

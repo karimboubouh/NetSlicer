@@ -88,7 +88,7 @@ def get_mac_addr(bytes_addr):
 
 
 def setup_environment(args):
-    reset_environment()
+    # reset_environment()
     """Configure system for routing and slicing"""
     log('blue', f"Configure NetSlicer system for routing")
     if config.IS_LINUX:
@@ -113,7 +113,7 @@ def setup_environment(args):
 def reset_environment(args=None):
     log('blue', f"Reset system environment...")
     if config.IS_LINUX:
-        log('cyan', f"Disable IP forwarding...")
+        log('cyan', f"Disable IP forwarding (Linux)...")
         subprocess.run(["sysctl", "-w", "net.ipv4.ip_forward=0"], check=True)
         log('cyan', f"Remove iptables rule from NFQUEUE...")
         subprocess.run(
@@ -121,7 +121,7 @@ def reset_environment(args=None):
             check=False,  # Use check=False as rule might not exist if setup failed
         )
     elif config.IS_MACOS:
-        log('cyan', f"Disable IP forwarding...")
+        log('cyan', f"Disable IP forwarding (MacOS)...")
         subprocess.run(["sysctl", "-w", "net.inet.ip.forwarding=0"], check=True)  # CORRECT OID
         log('cyan', f"Disabling the Packet Filter...")
         subprocess.run(["pfctl", "-d"], check=False)  # Consider adding this

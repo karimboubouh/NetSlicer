@@ -3,7 +3,10 @@ from config import HANDLE
 
 class Policy:
     def __init__(self, classid, **kwargs):
-        self.classid = f"{HANDLE}{classid}"
+        # self.classid = f"{HANDLE}{classid}"
+        self.classid = classid
+        # Max number of packets in the FIFO queue
+        self.qsize = kwargs.get('qsize', 100)
         # Guaranteed bandwidth
         self.rate = kwargs.get('rate', "10mbit")
         # Maximum bandwidth when spare is available (borrow unused bandwidth up to ceil.)

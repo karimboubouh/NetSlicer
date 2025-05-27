@@ -1,13 +1,11 @@
 import config
 from core.classifier import PacketClassifier
-from core.network_slice import NetworkSlice
 from core.parser import parse_args
-from core.policy import Policy
 from core.scanner import Scanner
 from core.slices_setup import setup_slices
 from core.sniffer import Sniffer
 from utils import log
-from utils.helpers import setup_environment, reset_environment
+from utils.helpers import reset_environment, setup_environment
 
 """
 TOS: the differentiated services
@@ -16,9 +14,9 @@ TOS: the differentiated services
 -> Use VPN
     -> What is the capacity of the VPN server
 -> Do the performance trial
-    -> locally 
+    -> locally
     -> With Xavier
--> memory size: Buffer size :: assume a list of fixed size and can support a small fixed number of packets 
+-> memory size: Buffer size :: assume a list of fixed size and can support a small fixed number of packets
 
 iperf3: small packets / find the max capacity for max packets per seconds.
 do simple IP forwarding of packets
@@ -32,28 +30,22 @@ def net_slicer():
     # === Configuration =========================
     parse_args()
     assert config.args is not None
-    config.args.display_metrics = True
-    config.args.display_packets = True
+    config.args.display_metrics = False
+    config.args.display_packets = False
     # === Environment setup =====================
-    # setup_environment(config.args)
+    setup_environment(config.args)
     # === Scan for network interfaces ===========
     scanner = Scanner()
-    scanner.interface = "en0"
-    scanner.filters = "ip or tcp or udp or icmp"
-    # scanner.select_interface()
-    # scanner.packet_filter()  # Berkeley Packet Filter
+    # scanner.interface = "eth0"
+    # scanner.filters = "ip or tcp or udp or icmp"
+    scanner.select_interface()
+    scanner.packet_filter()  # Berkeley Packet Filter
     # === Network Slices =========================
     ns_urllc, ns_embb, ns_mmtc = setup_slices(scanner.interface)
-    slices = {
-        'urllc': ns_urllc,
-        'embb': ns_embb,
-        'mmtc': ns_mmtc
-    }
-
+    slices = {"urllc": ns_urllc, "embb": ns_embb, "mmtc": ns_mmtc}
     # === Classifier Sniffer =====================
     classifier = PacketClassifier(slices=slices, args=config.args)
     # === Packet Sniffer ========================
-    exit(0)
     sniffer = Sniffer(args=config.args, scanner=scanner, classifier=classifier)
     sniffer.start_sniffing()
     # === Plot results ==========================
@@ -61,8 +53,8 @@ def net_slicer():
     reset_environment()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     try:
         net_slicer()
     except KeyboardInterrupt:
-        log('red', "NetSlicer DONE by KeyboardInterrupt!")
+        log("red", "NetSlicer DONE by KeyboardInterrupt!")

@@ -15,6 +15,7 @@ class Args:
     display_metrics: bool
     store_packets: bool
     interface: str
+    rate_limit: str
     # System configuration
     gpu: bool
     verbose: Literal['DEBUG', 'INFO', 'WARNING', 'ERROR']
@@ -46,6 +47,13 @@ def parse_args() -> Args:
         '--store-packets',
         action='store_true',
         help='Store sniffed packets in database'
+    )
+
+    parser.add_argument(
+        '--rate-limit',
+        type=str,
+        default="20mbit",
+        help='Rate limit'
     )
 
     # System configuration

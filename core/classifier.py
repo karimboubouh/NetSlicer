@@ -19,7 +19,7 @@ class PacketClassifier:
             print("Warning: Non-IP packet cannot be sliced")
             return
 
-        dscp = packet["IP"].tos
+        dscp = packet["IP"].tos & 0xFC
         if dscp == 0x2E:
             ns: NetworkSlice = self.slices["urllc"]
             ns.process_packet(packet)
@@ -33,4 +33,4 @@ class PacketClassifier:
             ns.process_packet(packet)
             cprint(f">> Packet {packet} send to URLLC Slice", "black", attrs=["bold"])
         else:
-            cprint(f">> Packet {packet} is not classified!", "grey", attrs=["bold"])
+            cprint(f">> Packet {packet}[DSCP={dscp}] is not classified! ", "grey", attrs=["bold"])

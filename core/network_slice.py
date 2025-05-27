@@ -9,10 +9,12 @@ from typing import Optional, Dict, Any
 
 from config import HANDLE
 from core.policy import Policy
+from utils import log
 
 
 class NetworkSlice:
-    def __init__(self, name: str, dscp: int, interface, policy: Policy, packet_handler=None, packet_handler_args=None, args=None):
+    def __init__(self, name: str, dscp: int, interface, policy: Policy, packet_handler=None, packet_handler_args=None,
+                 args=None):
         self.name = name
         self.dscp = dscp
         self.policy = policy
@@ -25,33 +27,35 @@ class NetworkSlice:
         self.current_packet: Optional[Packet] = None
 
         # TC-specific attributes
-        self.parent_handle = "1:"  # Default root qdisc handle
-        self.classid = None
-        self.qdisc_handle = f"{self.policy.classid}:1"
+        self.tc_handle = f"1:"  # Default root qdisc handle
+        self.tc_classid = f"{self.tc_handle}{policy.classid}"
+        self.tc_qdisc = f"1{self.policy.classid}:"
+        self.tc_flowid = f"{self.policy.classid}:1"
 
     def configure(self) -> None:
         """Configure TC queuing discipline for this slice"""
 
+        log('yellow', f"Configuring slice {self.name}...")
         # Create root HTB qdisc if not exists
         cmd = f"tc qdisc show dev {self.interface} | grep htb"
         if subprocess.call(cmd, shell=True) != 0:
             subprocess.run([
                 "tc", "qdisc", "add", "dev", self.interface,
-                "root", "handle", HANDLE, "htb"
+                "root", "handle", self.tc_handle, "htb"
             ], check=True)
 
         # Create class for this slice
         subprocess.run([
             "tc", "class", "add", "dev", self.interface,
-            "parent", "1:", "classid", self.classid,
-            "htb", "rate", self.policy.rate, "burst", self.policy.burst
+            "parent", self.tc_handle, "classid", self.tc_classid,
+            "htb", "rate", self.policy.rate, "ceil", self.policy.ceil, "burst", self.policy.burst
         ], check=True)
 
         # Add leaf qdisc
         subprocess.run([
             "tc", "qdisc", "add", "dev", self.interface,
-            "parent", self.policy.classid, "handle", self.qdisc_handle,
-            "pfifo", "limit", str(self.args.get("limit", 100))
+            "parent", self.tc_classid, "handle", self.tc_qdisc,
+            "pfifo", "limit", str(self.policy.qsize)
         ], check=True)
 
         # Add DSCP filter
@@ -60,7 +64,7 @@ class NetworkSlice:
             "protocol", "ip", "parent", "1:",
             "prio", "1", "u32",
             "match", "ip", "tos", hex(self.dscp), "0xff",
-            "flowid", self.policy.classid
+            "flowid", self.tc_classid
         ], check=True)
 
     def process_packet(self, packet: Packet) -> None:
@@ -98,7 +102,7 @@ class NetworkSlice:
         if hasattr(self, "qdisc_handle"):
             subprocess.run([
                 "tc", "qdisc", "del", "dev", self.interface,
-                "handle", self.qdisc_handle.split(":")[0]
+                "handle", self.tc_qdisc.split(":")[0]
             ], check=False)
 
 
