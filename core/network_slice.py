@@ -1,13 +1,10 @@
 import subprocess
+from typing import Optional, Dict, List
 
-from scapy.packet import Packet
+import torch
+from scapy.all import Packet, sendp
 from termcolor import cprint
 
-from scapy.all import Packet, sendp
-import subprocess
-from typing import Optional, Dict, Any
-
-from config import HANDLE
 from core.policy import Policy
 from utils import log
 
@@ -88,6 +85,67 @@ class NetworkSlice:
         # Forward packet
         sendp(packet, iface=self.interface, verbose=False)
         self.current_packet = None
+
+    def process_packet_batch_gpu(self, packets: List[Packet]) -> None:
+        if not packets:
+            return
+        # ── Step 1: Update byte_counter and packet_counter in batch on GPU ─────────────
+        lengths = [len(pkt) for pkt in packets]
+        lengths_tensor = torch.tensor(lengths, dtype=torch.int32, device="cuda")
+        total_bytes = int(torch.sum(lengths_tensor).item())
+        self.byte_counter += total_bytes
+        self.packet_counter += len(packets)
+        # ── Step 2: Build a ByteTensor of all IP headers to modify TOS and recompute checksum
+        HEADER_LEN = 20
+        header_bytes_list = []
+        for pkt in packets:
+            ip_layer = pkt.getlayer("IP")
+            if ip_layer is None:
+                header_bytes_list.append([0] * HEADER_LEN)
+                continue
+            raw_ip = bytes(ip_layer)[:HEADER_LEN]
+            header_bytes_list.append(list(raw_ip))
+
+        headers_tensor = torch.tensor(header_bytes_list, dtype=torch.uint8, device="cuda")
+        batch_size = headers_tensor.size(0)
+        # ── Step 3: Modify the TOS (byte offset 1) for all headers in parallel ─────────
+        tos_byte = self.dscp & 0xFF
+        headers_tensor[:, 1] = tos_byte
+        # ── Step 4: Zero out the existing checksum bytes (offsets 10 and 11) ───────────
+        headers_tensor[:, 10] = 0
+        headers_tensor[:, 11] = 0
+        # ── Step 5: Compute new IP checksums in parallel ───────────────────────────────
+        words = headers_tensor.view(batch_size, HEADER_LEN // 2, 2)
+        high_bytes = words[:, :, 0].to(torch.int32)
+        low_bytes = words[:, :, 1].to(torch.int32)
+        word16 = (high_bytes << 8) + low_bytes
+        sum16 = torch.sum(word16, dim=1)
+        def fold_carry(x: torch.Tensor) -> torch.Tensor:
+            carry = x >> 16
+            lower = x & 0xFFFF
+            return lower + carry
+        sum16 = fold_carry(sum16)
+        checksum16 = (~sum16) & 0xFFFF
+        checksum_hi = ((checksum16 >> 8) & 0xFF).to(torch.uint8)
+        checksum_lo = (checksum16 & 0xFF).to(torch.uint8)
+        headers_tensor[:, 10] = checksum_hi
+        headers_tensor[:, 11] = checksum_lo
+        # ── Step 6: Pull header updates back to CPU and apply to each Packet ───────────
+        headers_cpu = headers_tensor.to("cpu").tolist()
+        for i, pkt in enumerate(packets):
+            ip_layer = pkt.getlayer("IP")
+            if ip_layer is None:
+                continue
+            pkt["IP"].tos = tos_byte
+            pkt["IP"].chksum = int(checksum16[i].item())
+        # ── Step 7: Invoke any slice‐specific handler (on CPU) ─────────────────────────
+        if self.handler is not None:
+            for pkt in packets:
+                self.handler(pkt, **self.handler_args)
+        # ── Step 8: Forward all packets via sendp (CPU) ────────────────────────────────
+
+        for pkt in packets:
+            sendp(pkt, iface=self.interface, verbose=False)
 
     def get_stats(self) -> Dict[str, int]:
         """Return current slice statistics"""

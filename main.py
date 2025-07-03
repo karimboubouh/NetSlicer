@@ -1,6 +1,7 @@
 import config
 from core.classifier import PacketClassifier
 from core.parser import parse_args
+from termcolor import cprint
 from core.scanner import Scanner
 from core.slices_setup import setup_slices
 from core.sniffer import Sniffer
@@ -30,8 +31,8 @@ def net_slicer():
     # === Configuration =========================
     parse_args()
     assert config.args is not None
-    config.args.display_metrics = False
-    config.args.display_packets = False
+    config.args.display_metrics = True
+    config.args.display_packets = True
     # === Environment setup =====================
     setup_environment(config.args)
     # === Scan for network interfaces ===========
